@@ -1,0 +1,1012 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Asset Location Monte Carlo Simulator</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    /* ── Reset & base ──────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+      font-size: 14px;
+      background: #f0f4f8;
+      color: #1a2a3a;
+      line-height: 1.5;
+    }
+
+    /* ── Layout ────────────────────────────────────────────────────── */
+    header {
+      background: #1F3A5F;
+      color: #fff;
+      padding: 24px 40px 20px;
+    }
+    header h1 { font-size: 1.6rem; font-weight: 700; margin-bottom: 4px; }
+    header p  { font-size: 0.9rem; opacity: 0.75; }
+
+    main { max-width: 1400px; margin: 32px auto; padding: 0 24px 60px; }
+
+    section { margin-bottom: 36px; }
+
+    .section-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #1F3A5F;
+      margin-bottom: 16px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid #D9E1F2;
+    }
+
+    /* ── Card ──────────────────────────────────────────────────────── */
+    .card {
+      background: #fff;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+      padding: 24px;
+    }
+
+    /* ── Input grid ────────────────────────────────────────────────── */
+    .input-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+    }
+
+    .input-group {
+      background: #fff;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+      padding: 20px;
+    }
+
+    .input-group h3 {
+      font-size: 0.85rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #2E75B6;
+      margin-bottom: 14px;
+    }
+
+    .field { margin-bottom: 12px; }
+
+    .field label {
+      display: block;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: #4a5568;
+      margin-bottom: 4px;
+    }
+
+    .field input {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid #ccd6e0;
+      border-radius: 5px;
+      font-size: 0.9rem;
+      font-family: inherit;
+      color: #1a2a3a;
+      background: #fafcff;
+      transition: border-color 0.15s;
+    }
+
+    .field input:focus {
+      outline: none;
+      border-color: #2E75B6;
+      box-shadow: 0 0 0 3px rgba(46,117,182,0.12);
+    }
+
+    /* ── Validation ────────────────────────────────────────────────── */
+    #validation-errors {
+      display: none;
+      background: #fff2f2;
+      border: 1px solid #f5a0a0;
+      border-radius: 6px;
+      padding: 14px 18px;
+      margin-top: 16px;
+      color: #c0392b;
+      font-size: 0.88rem;
+    }
+
+    #validation-errors ul { padding-left: 18px; }
+    #validation-errors li { margin-bottom: 4px; }
+
+    /* ── Run button ────────────────────────────────────────────────── */
+    .run-row {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-top: 20px;
+    }
+
+    #runBtn {
+      background: #1F3A5F;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 12px 32px;
+      font-size: 1rem;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      transition: background 0.2s;
+      letter-spacing: 0.2px;
+    }
+    #runBtn:hover  { background: #2E75B6; }
+    #runBtn:disabled { background: #9ab0c8; cursor: not-allowed; }
+
+    #running-msg {
+      display: none;
+      font-size: 0.9rem;
+      color: #2E75B6;
+    }
+
+    /* ── Stat cards ────────────────────────────────────────────────── */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 16px;
+    }
+
+    .stat-card {
+      background: #fff;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+      padding: 20px 16px;
+      text-align: center;
+      border-top: 4px solid transparent;
+    }
+
+    .stat-card .s-label {
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #6b7c93;
+      margin-bottom: 8px;
+    }
+
+    .stat-card .s-value {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    .stat-card .s-sub {
+      font-size: 0.75rem;
+      color: #8a9ab0;
+      line-height: 1.35;
+    }
+
+    /* ── Chart ─────────────────────────────────────────────────────── */
+    .chart-wrap {
+      position: relative;
+      height: 400px;
+    }
+
+    /* ── Median table ──────────────────────────────────────────────── */
+    .median-note {
+      font-size: 0.85rem;
+      color: #5a6a7a;
+      margin-bottom: 12px;
+      line-height: 1.5;
+    }
+
+    .table-scroll {
+      overflow-x: auto;
+      border-radius: 6px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+    }
+
+    .median-table {
+      border-collapse: collapse;
+      white-space: nowrap;
+      font-size: 0.78rem;
+      width: 100%;
+    }
+
+    .median-table thead tr th {
+      padding: 8px 10px;
+      font-weight: 700;
+      text-align: center;
+      color: #fff;
+      position: sticky;
+      top: 0;
+      z-index: 2;
+    }
+
+    /* Column group header colors */
+    .median-table th.g-year    { background: #4a5568; }
+    .median-table th.g-market  { background: #5a6a7a; }
+    .median-table th.g-al-td   { background: #1F3A5F; }
+    .median-table th.g-al-te   { background: #2E75B6; }
+    .median-table th.g-nal-td  { background: #a05000; }
+    .median-table th.g-nal-te  { background: #8b1a1a; }
+    .median-table th.g-summary { background: #1a5a3a; }
+
+    /* Sub-header row */
+    .median-table tr.th-sub th {
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 6px 8px;
+    }
+    .median-table .sh-year    { background: #5d6d7e; }
+    .median-table .sh-market  { background: #6b7c8d; }
+    .median-table .sh-al-td   { background: #243f6e; }
+    .median-table .sh-al-te   { background: #3a82c4; }
+    .median-table .sh-nal-td  { background: #b05f10; }
+    .median-table .sh-nal-te  { background: #9e2020; }
+    .median-table .sh-summary { background: #236b47; }
+
+    /* Data rows */
+    .median-table tbody tr.even { background: #f5f7fa; }
+    .median-table tbody tr.odd  { background: #fff; }
+    .median-table tbody tr:hover { background: #e8f0fc; }
+
+    .median-table tbody td {
+      padding: 7px 10px;
+      text-align: right;
+      border-bottom: 1px solid #e8ecf0;
+    }
+
+    .median-table tbody td.td-year {
+      text-align: center;
+      font-weight: 700;
+      color: #1F3A5F;
+      position: sticky;
+      left: 0;
+      z-index: 1;
+      background: inherit;
+    }
+
+    .median-table .pos { color: #27ae60; font-weight: 600; }
+    .median-table .neg { color: #e74c3c; font-weight: 600; }
+    .median-table .zero{ color: #888; }
+
+    /* ── Utility ────────────────────────────────────────────────────── */
+    .hidden { display: none; }
+
+    @media (max-width: 1100px) {
+      .input-grid { grid-template-columns: repeat(2, 1fr); }
+      .stat-grid  { grid-template-columns: repeat(3, 1fr); }
+    }
+    @media (max-width: 700px) {
+      .input-grid { grid-template-columns: 1fr; }
+      .stat-grid  { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Asset Location Monte Carlo Simulator</h1>
+  <p>Compare the after-tax outcomes of placing bonds in tax-deferred accounts vs. holding a uniform allocation across account types.</p>
+</header>
+
+<main>
+
+  <!-- ── INPUT SECTION ─────────────────────────────────────────────── -->
+  <section>
+    <div class="section-title">Inputs</div>
+    <div class="input-grid">
+
+      <!-- Portfolio Values -->
+      <div class="input-group">
+        <h3>Portfolio Values</h3>
+        <div class="field">
+          <label>Total Portfolio Value ($)</label>
+          <input type="number" id="inp-totalPortfolio" value="1000000" min="0" step="1000" />
+        </div>
+        <div class="field">
+          <label>Tax-Deferred Account Value ($)</label>
+          <input type="number" id="inp-taxDeferred" value="500000" min="0" step="1000" />
+        </div>
+        <div class="field">
+          <label>Tax-Exempt Account Value ($)</label>
+          <input type="number" id="inp-taxExempt" value="500000" min="0" step="1000" />
+        </div>
+      </div>
+
+      <!-- Simulation Parameters -->
+      <div class="input-group">
+        <h3>Simulation Parameters</h3>
+        <div class="field">
+          <label>Number of Years</label>
+          <input type="number" id="inp-years" value="30" min="1" max="100" step="1" />
+        </div>
+        <div class="field">
+          <label>Number of Simulations</label>
+          <input type="number" id="inp-numSims" value="1000" min="1" max="10000" step="100" />
+        </div>
+      </div>
+
+      <!-- Tax -->
+      <div class="input-group">
+        <h3>Tax</h3>
+        <div class="field">
+          <label>Effective Tax Rate (%) — applied to tax-deferred account at end</label>
+          <input type="number" id="inp-taxRate" value="25" min="0" max="100" step="0.5" />
+        </div>
+      </div>
+
+      <!-- Asset Allocation -->
+      <div class="input-group">
+        <h3>Asset Allocation</h3>
+        <div class="field">
+          <label>Stock Allocation (%)</label>
+          <input type="number" id="inp-stockAlloc" value="60" min="0" max="100" step="1" />
+        </div>
+        <div class="field">
+          <label>Bond Allocation (%)</label>
+          <input type="number" id="inp-bondAlloc" value="40" min="0" max="100" step="1" />
+        </div>
+      </div>
+
+      <!-- Stock Return Assumptions -->
+      <div class="input-group">
+        <h3>Stock Return Assumptions</h3>
+        <div class="field">
+          <label>Expected Annual Return (%)</label>
+          <input type="number" id="inp-stockMean" value="10" step="0.5" />
+        </div>
+        <div class="field">
+          <label>Standard Deviation (%)</label>
+          <input type="number" id="inp-stockStd" value="18" min="0" step="0.5" />
+        </div>
+      </div>
+
+      <!-- Bond Return Assumptions -->
+      <div class="input-group">
+        <h3>Bond Return Assumptions</h3>
+        <div class="field">
+          <label>Expected Annual Return (%)</label>
+          <input type="number" id="inp-bondMean" value="4" step="0.5" />
+        </div>
+        <div class="field">
+          <label>Standard Deviation (%)</label>
+          <input type="number" id="inp-bondStd" value="6" min="0" step="0.5" />
+        </div>
+      </div>
+
+    </div><!-- /input-grid -->
+
+    <div id="validation-errors"></div>
+
+    <div class="run-row">
+      <button id="runBtn">▶ Run Simulation</button>
+      <span id="running-msg">Running simulation…</span>
+    </div>
+  </section>
+
+  <!-- ── RESULTS ───────────────────────────────────────────────────── -->
+  <div id="results" class="hidden">
+
+    <!-- Headline Stats -->
+    <section>
+      <div class="section-title">Summary Results</div>
+      <div class="stat-grid" id="stat-grid"></div>
+    </section>
+
+    <!-- Chart -->
+    <section>
+      <div class="section-title">Average Stock Allocation by Account Over Time</div>
+      <div class="card">
+        <div class="chart-wrap">
+          <canvas id="allocationChart"></canvas>
+        </div>
+        <p style="font-size:0.78rem;color:#8a9ab0;margin-top:12px;text-align:center;">
+          Asset Location strategy averages across all simulations. No Asset Location lines are flat at the target stock allocation — both tax-deferred and tax-exempt accounts are identical under that strategy.
+        </p>
+      </div>
+    </section>
+
+    <!-- Median Simulation Table -->
+    <section>
+      <div class="section-title">Median Simulation — Year-by-Year Detail</div>
+      <p class="median-note" id="median-note"></p>
+      <div id="table-container"></div>
+    </section>
+
+  </div><!-- /results -->
+
+</main>
+
+<script>
+// =============================================================================
+// SECTION 1 — UTILITIES
+// =============================================================================
+
+/**
+ * Box-Muller transform: generates a normally distributed random number.
+ * @param {number} mean
+ * @param {number} std
+ * @returns {number}
+ */
+function randomNormal(mean, std) {
+  let u, v;
+  do { u = Math.random(); } while (u === 0);
+  do { v = Math.random(); } while (v === 0);
+  const z = Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+  return mean + std * z;
+}
+
+/** Format a number as currency: $1,234,567 */
+function fmt$(val) {
+  const abs = Math.round(Math.abs(val)).toLocaleString();
+  return (val < 0 ? '-$' : '$') + abs;
+}
+
+/** Format a decimal as a percentage string. sign=true adds + prefix for positives. */
+function fmtPct(val, sign = false) {
+  const str = (val * 100).toFixed(2) + '%';
+  return sign && val > 0 ? '+' + str : str;
+}
+
+/** Format a decimal allocation as "xx.x%" */
+function fmtAlloc(val) {
+  return (val * 100).toFixed(1) + '%';
+}
+
+
+// =============================================================================
+// SECTION 2 — INPUT READING
+// =============================================================================
+
+function readInputs() {
+  const n  = id => parseFloat(document.getElementById(id).value);
+  const ni = id => parseInt(document.getElementById(id).value, 10);
+  return {
+    totalPortfolio : n('inp-totalPortfolio'),
+    taxDeferred    : n('inp-taxDeferred'),
+    taxExempt      : n('inp-taxExempt'),
+    years          : ni('inp-years'),
+    numSims        : ni('inp-numSims'),
+    taxRate        : n('inp-taxRate')     / 100,
+    stockAlloc     : n('inp-stockAlloc')  / 100,
+    bondAlloc      : n('inp-bondAlloc')   / 100,
+    stockMean      : n('inp-stockMean')   / 100,
+    stockStd       : n('inp-stockStd')    / 100,
+    bondMean       : n('inp-bondMean')    / 100,
+    bondStd        : n('inp-bondStd')     / 100,
+  };
+}
+
+
+// =============================================================================
+// SECTION 3 — VALIDATION
+// =============================================================================
+
+function validateInputs(inp) {
+  const errors = [];
+  const { totalPortfolio, taxDeferred, taxExempt, years, numSims,
+          taxRate, stockAlloc, bondAlloc, stockStd, bondStd } = inp;
+
+  if (isNaN(totalPortfolio)  || totalPortfolio < 0)  errors.push('Total Portfolio Value must be a non-negative number.');
+  if (isNaN(taxDeferred)     || taxDeferred < 0)     errors.push('Tax-Deferred Account Value must be non-negative.');
+  if (isNaN(taxExempt)       || taxExempt < 0)       errors.push('Tax-Exempt Account Value must be non-negative.');
+  if (!isNaN(taxDeferred) && !isNaN(taxExempt) && !isNaN(totalPortfolio) &&
+      Math.abs(taxDeferred + taxExempt - totalPortfolio) > 1)
+    errors.push('Tax-Deferred + Tax-Exempt must equal Total Portfolio Value (currently off by $' +
+      Math.round(Math.abs(taxDeferred + taxExempt - totalPortfolio)).toLocaleString() + ').');
+
+  if (isNaN(years)   || years < 1)    errors.push('Number of Years must be at least 1.');
+  if (isNaN(numSims) || numSims < 1)  errors.push('Number of Simulations must be at least 1.');
+  if (isNaN(taxRate) || taxRate < 0 || taxRate > 1)
+    errors.push('Effective Tax Rate must be between 0% and 100%.');
+
+  if (isNaN(stockAlloc) || stockAlloc < 0)  errors.push('Stock Allocation must be non-negative.');
+  if (isNaN(bondAlloc)  || bondAlloc < 0)   errors.push('Bond Allocation must be non-negative.');
+  if (!isNaN(stockAlloc) && !isNaN(bondAlloc) &&
+      Math.abs(stockAlloc + bondAlloc - 1) > 0.0001)
+    errors.push('Stock Allocation + Bond Allocation must equal 100% (currently ' +
+      ((stockAlloc + bondAlloc) * 100).toFixed(1) + '%).');
+
+  if (isNaN(stockStd) || stockStd < 0)  errors.push('Stock Standard Deviation must be non-negative.');
+  if (isNaN(bondStd)  || bondStd < 0)   errors.push('Bond Standard Deviation must be non-negative.');
+
+  return errors;
+}
+
+
+// =============================================================================
+// SECTION 4 — SIMULATION ENGINE
+// =============================================================================
+
+/**
+ * Runs the Monte Carlo simulation for both strategies.
+ *
+ * Both strategies share the same random returns for each simulation-year pair,
+ * ensuring that any difference in outcomes is purely due to asset location, not luck.
+ *
+ * Asset Location Strategy:
+ *   – Fill the tax-deferred account with bonds first.
+ *   – Overflow any remaining bonds into the tax-exempt account.
+ *   – Stocks fill remaining space in both accounts.
+ *
+ * No Asset Location Strategy:
+ *   – Both accounts maintain the target stock/bond allocation each year.
+ *
+ * Returns:
+ *   pctDiffs        — per-simulation percentage difference (AL after-tax vs NAL after-tax)
+ *   stockReturns    — all random stock returns [numSims × years], for median replay
+ *   bondReturns     — all random bond returns  [numSims × years], for median replay
+ *   sumAL_TD_sp     — running sum of AL tax-deferred stock %, for chart averages
+ *   sumAL_TE_sp     — running sum of AL tax-exempt   stock %, for chart averages
+ */
+function runMonteCarlo(inp) {
+  const { taxDeferred: initTD, taxExempt: initTE, years, numSims,
+          taxRate, stockAlloc, bondAlloc, stockMean, stockStd, bondMean, bondStd } = inp;
+
+  // Store all returns so the median simulation can be replayed exactly.
+  const stockReturns = new Float64Array(numSims * years);
+  const bondReturns  = new Float64Array(numSims * years);
+
+  // Chart accumulator: average AL stock allocation % by year.
+  // NAL is always flat at stockAlloc — no accumulation needed.
+  const sumAL_TD_sp = new Float64Array(years);
+  const sumAL_TE_sp = new Float64Array(years);
+
+  // Per-simulation outcome: (AL after-tax − NAL after-tax) / NAL after-tax
+  const pctDiffs = new Float64Array(numSims);
+
+  for (let s = 0; s < numSims; s++) {
+    let al_td  = initTD,  al_te  = initTE;   // Asset Location account values
+    let nal_td = initTD,  nal_te = initTE;   // No Asset Location account values
+
+    for (let y = 0; y < years; y++) {
+      // ── Generate returns (shared between both strategies) ──────────────────
+      const sr = randomNormal(stockMean, stockStd);
+      const br = randomNormal(bondMean,  bondStd);
+      stockReturns[s * years + y] = sr;
+      bondReturns [s * years + y] = br;
+
+      // ── ASSET LOCATION: Rebalance ─────────────────────────────────────────
+      // Goal: fill tax-deferred with bonds first, then put stocks in remaining space.
+      const total_al   = al_td + al_te;
+      const totalBonds = bondAlloc * total_al;       // total bonds needed
+      const bondsInTD  = Math.min(al_td, totalBonds); // bonds placed in TD (up to TD capacity)
+      const bondsInTE  = totalBonds - bondsInTD;       // overflow bonds into TE
+      const stocksInTD = al_td - bondsInTD;            // remaining TD space → stocks
+      const stocksInTE = al_te - bondsInTE;            // remaining TE space → stocks
+
+      const al_td_sp = al_td > 0 ? stocksInTD / al_td : 0;  // stock % in TD
+      const al_td_bp = 1 - al_td_sp;                          // bond  % in TD
+      const al_te_sp = al_te > 0 ? stocksInTE / al_te : 0;  // stock % in TE
+      const al_te_bp = 1 - al_te_sp;                          // bond  % in TE
+
+      sumAL_TD_sp[y] += al_td_sp;
+      sumAL_TE_sp[y] += al_te_sp;
+
+      // Apply returns
+      al_td *= 1 + al_td_sp * sr + al_td_bp * br;
+      al_te *= 1 + al_te_sp * sr + al_te_bp * br;
+
+      // ── NO ASSET LOCATION: Rebalance ──────────────────────────────────────
+      // Both accounts always hold the target stock/bond allocation.
+      const nal_ret = stockAlloc * sr + bondAlloc * br;
+      nal_td *= 1 + nal_ret;
+      nal_te *= 1 + nal_ret;
+    }
+
+    // ── After-tax final values ─────────────────────────────────────────────
+    // Tax is applied only to the tax-deferred account at the end.
+    const al_afterTax  = al_td  * (1 - taxRate) + al_te;
+    const nal_afterTax = nal_td * (1 - taxRate) + nal_te;
+    pctDiffs[s] = (al_afterTax - nal_afterTax) / nal_afterTax;
+  }
+
+  return { pctDiffs, stockReturns, bondReturns, sumAL_TD_sp, sumAL_TE_sp };
+}
+
+
+// =============================================================================
+// SECTION 5 — STATISTICS
+// =============================================================================
+
+function computeStats(pctDiffs, numSims) {
+  // Sort for order statistics
+  const sorted = Array.from(pctDiffs).sort((a, b) => a - b);
+
+  // Mean
+  let sum = 0;
+  for (let i = 0; i < numSims; i++) sum += pctDiffs[i];
+  const mean = sum / numSims;
+
+  // Median (average of two middle values for even N)
+  const median = numSims % 2 === 0
+    ? (sorted[numSims / 2 - 1] + sorted[numSims / 2]) / 2
+    : sorted[Math.floor(numSims / 2)];
+
+  // Population standard deviation
+  let sumSq = 0;
+  for (let i = 0; i < numSims; i++) sumSq += (pctDiffs[i] - mean) ** 2;
+  const stdDev = Math.sqrt(sumSq / numSims);
+
+  // Min / Max
+  const min = sorted[0];
+  const max = sorted[numSims - 1];
+
+  // Success rate: how often did asset location win?
+  let successCount = 0;
+  for (let i = 0; i < numSims; i++) if (pctDiffs[i] > 0) successCount++;
+
+  // Median simulation index: the sim whose pctDiff is closest to the median value
+  let medianSimIdx = 0;
+  let minDist = Infinity;
+  for (let i = 0; i < numSims; i++) {
+    const d = Math.abs(pctDiffs[i] - median);
+    if (d < minDist) { minDist = d; medianSimIdx = i; }
+  }
+
+  return {
+    successCount, successRate: successCount / numSims,
+    mean, median, stdDev, min, max, medianSimIdx,
+  };
+}
+
+
+// =============================================================================
+// SECTION 6 — MEDIAN SIMULATION REPLAY
+// =============================================================================
+
+/**
+ * Replays a single simulation using stored random draws, recording year-by-year detail.
+ * Identical logic to runMonteCarlo but captures all intermediate values for the table.
+ */
+function replayMedianSim(inp, stockReturns, bondReturns, medianSimIdx) {
+  const { taxDeferred: initTD, taxExempt: initTE, years,
+          taxRate, stockAlloc, bondAlloc } = inp;
+
+  const rows = [];
+  let al_td  = initTD,  al_te  = initTE;
+  let nal_td = initTD,  nal_te = initTE;
+
+  for (let y = 0; y < years; y++) {
+    const sr = stockReturns[medianSimIdx * years + y];
+    const br = bondReturns [medianSimIdx * years + y];
+
+    // ── Asset Location ────────────────────────────────────────────────────
+    const al_td_beg = al_td;
+    const al_te_beg = al_te;
+
+    const total_al   = al_td + al_te;
+    const totalBonds = bondAlloc * total_al;
+    const bondsInTD  = Math.min(al_td, totalBonds);
+    const bondsInTE  = totalBonds - bondsInTD;
+    const stocksInTD = al_td - bondsInTD;
+    const stocksInTE = al_te - bondsInTE;
+
+    const al_td_sp = al_td > 0 ? stocksInTD / al_td : 0;
+    const al_td_bp = 1 - al_td_sp;
+    const al_te_sp = al_te > 0 ? stocksInTE / al_te : 0;
+    const al_te_bp = 1 - al_te_sp;
+
+    const al_td_ret = al_td_sp * sr + al_td_bp * br;
+    const al_te_ret = al_te_sp * sr + al_te_bp * br;
+
+    al_td *= 1 + al_td_ret;
+    al_te *= 1 + al_te_ret;
+
+    // ── No Asset Location ─────────────────────────────────────────────────
+    const nal_td_beg = nal_td;
+    const nal_te_beg = nal_te;
+    const nal_ret    = stockAlloc * sr + bondAlloc * br;
+
+    nal_td *= 1 + nal_ret;
+    nal_te *= 1 + nal_ret;
+
+    // ── Totals ────────────────────────────────────────────────────────────
+    const al_total     = al_td  + al_te;
+    const al_afterTax  = al_td  * (1 - taxRate) + al_te;
+    const nal_total    = nal_td + nal_te;
+    const nal_afterTax = nal_td * (1 - taxRate) + nal_te;
+
+    rows.push({
+      year: y + 1, sr, br,
+      // AL tax-deferred
+      al_td_beg, al_td_sp, al_td_bp, al_td_ret, al_td_end: al_td,
+      // AL tax-exempt
+      al_te_beg, al_te_sp, al_te_bp, al_te_ret, al_te_end: al_te,
+      // NAL tax-deferred (always at target allocation)
+      nal_td_beg, nal_td_sp: stockAlloc, nal_td_bp: bondAlloc, nal_td_ret: nal_ret, nal_td_end: nal_td,
+      // NAL tax-exempt (always at target allocation)
+      nal_te_beg, nal_te_sp: stockAlloc, nal_te_bp: bondAlloc, nal_te_ret: nal_ret, nal_te_end: nal_te,
+      // Summary
+      al_total, al_afterTax, nal_total, nal_afterTax,
+      diff: al_afterTax - nal_afterTax,
+    });
+  }
+  return rows;
+}
+
+
+// =============================================================================
+// SECTION 7 — CHART RENDERING
+// =============================================================================
+
+let chartInstance = null;
+
+function renderChart(inp, sumAL_TD_sp, sumAL_TE_sp) {
+  const { years, numSims, stockAlloc } = inp;
+
+  const labels      = Array.from({ length: years }, (_, i) => `Yr ${i + 1}`);
+  const avgAL_TD    = Array.from(sumAL_TD_sp, v => (v / numSims) * 100);
+  const avgAL_TE    = Array.from(sumAL_TE_sp, v => (v / numSims) * 100);
+  const flatNAL     = Array.from({ length: years }, () => stockAlloc * 100);
+
+  const ctx = document.getElementById('allocationChart').getContext('2d');
+  if (chartInstance) chartInstance.destroy();
+
+  chartInstance = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Asset Location — Tax Deferred',
+          data: avgAL_TD,
+          borderColor: '#1F3A5F',
+          backgroundColor: 'rgba(31,58,95,0.08)',
+          borderWidth: 2.5,
+          pointRadius: 0,
+          tension: 0.3,
+          fill: false,
+        },
+        {
+          label: 'Asset Location — Tax Exempt',
+          data: avgAL_TE,
+          borderColor: '#2E75B6',
+          backgroundColor: 'rgba(46,117,182,0.08)',
+          borderWidth: 2.5,
+          pointRadius: 0,
+          tension: 0.3,
+          fill: false,
+        },
+        {
+          label: 'No Asset Location — Tax Deferred',
+          data: flatNAL,
+          borderColor: '#e67e22',
+          borderWidth: 2,
+          borderDash: [8, 4],
+          pointRadius: 0,
+          fill: false,
+        },
+        {
+          label: 'No Asset Location — Tax Exempt',
+          data: flatNAL,
+          borderColor: '#c0392b',
+          borderWidth: 2,
+          borderDash: [3, 3],
+          pointRadius: 0,
+          fill: false,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: {
+          position: 'top',
+          labels: { font: { size: 12 }, padding: 16 },
+        },
+        tooltip: {
+          callbacks: {
+            label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(1)}%`,
+          },
+        },
+      },
+      scales: {
+        x: {
+          title: { display: true, text: 'Year', font: { size: 12 }, color: '#4a5568' },
+          ticks: { maxTicksLimit: 12 },
+          grid: { color: 'rgba(0,0,0,0.05)' },
+        },
+        y: {
+          title: { display: true, text: 'Stock Allocation (%)', font: { size: 12 }, color: '#4a5568' },
+          min: 0,
+          max: 100,
+          ticks: { callback: v => v + '%' },
+          grid: { color: 'rgba(0,0,0,0.05)' },
+        },
+      },
+    },
+  });
+}
+
+
+// =============================================================================
+// SECTION 8 — HEADLINE STAT CARDS
+// =============================================================================
+
+function renderStats(stats, numSims) {
+  const { successCount, successRate, mean, median, stdDev, min, max } = stats;
+
+  const posColor  = '#27ae60';
+  const negColor  = '#e74c3c';
+  const neutColor = '#1F3A5F';
+
+  function valColor(v) { return v > 0 ? posColor : v < 0 ? negColor : neutColor; }
+
+  const cards = [
+    {
+      label : 'Success Rate',
+      value : fmtPct(successRate),
+      sub   : `${successCount.toLocaleString()} of ${numSims.toLocaleString()} simulations`,
+      color : successRate >= 0.5 ? posColor : negColor,
+      border: successRate >= 0.5 ? posColor : negColor,
+    },
+    {
+      label : 'Mean Difference',
+      value : fmtPct(mean, true),
+      sub   : 'Average % advantage of asset location',
+      color : valColor(mean),
+      border: valColor(mean),
+    },
+    {
+      label : 'Median Difference',
+      value : fmtPct(median, true),
+      sub   : 'Midpoint % advantage across simulations',
+      color : valColor(median),
+      border: valColor(median),
+    },
+    {
+      label : 'Std Deviation',
+      value : fmtPct(stdDev),
+      sub   : 'Spread of outcomes across simulations',
+      color : neutColor,
+      border: '#2E75B6',
+    },
+    {
+      label : 'Minimum',
+      value : fmtPct(min, true),
+      sub   : 'Worst-case simulation result',
+      color : valColor(min),
+      border: valColor(min),
+    },
+    {
+      label : 'Maximum',
+      value : fmtPct(max, true),
+      sub   : 'Best-case simulation result',
+      color : valColor(max),
+      border: valColor(max),
+    },
+  ];
+
+  document.getElementById('stat-grid').innerHTML = cards.map(c => `
+    <div class="stat-card" style="border-top-color:${c.border}">
+      <div class="s-label">${c.label}</div>
+      <div class="s-value" style="color:${c.color}">${c.value}</div>
+      <div class="s-sub">${c.sub}</div>
+    </div>
+  `).join('');
+}
+
+
+// =============================================================================
+// SECTION 9 — MEDIAN SIMULATION TABLE
+// =============================================================================
+
+function renderTable(rows, medianPctDiff, inp) {
+  // Update the explanatory note
+  document.getElementById('median-note').innerHTML =
+    `This table traces the simulation whose final outcome was closest to the median across all simulations. ` +
+    `The final percentage difference for this simulation was <strong>${fmtPct(medianPctDiff, true)}</strong>. ` +
+    `It is intended to help you understand how the two strategies evolve year by year.`;
+
+  // Build header
+  const colGroupHead = `
+    <tr>
+      <th rowspan="2" class="g-year">Year</th>
+      <th colspan="2" class="g-market">Market Returns</th>
+      <th colspan="5" class="g-al-td">Asset Location — Tax Deferred</th>
+      <th colspan="5" class="g-al-te">Asset Location — Tax Exempt</th>
+      <th colspan="5" class="g-nal-td">No Asset Location — Tax Deferred</th>
+      <th colspan="5" class="g-nal-te">No Asset Location — Tax Exempt</th>
+      <th colspan="5" class="g-summary">End-of-Year Summary</th>
+    </tr>
+  `;
+
+  const colSubHead = `
+    <tr class="th-sub">
+      <th class="sh-market">Stock Ret</th><th class="sh-market">Bond Ret</th>
+      <th class="sh-al-td">Beg Value</th><th class="sh-al-td">Stock %</th><th class="sh-al-td">Bond %</th><th class="sh-al-td">Acct Ret</th><th class="sh-al-td">End Value</th>
+      <th class="sh-al-te">Beg Value</th><th class="sh-al-te">Stock %</th><th class="sh-al-te">Bond %</th><th class="sh-al-te">Acct Ret</th><th class="sh-al-te">End Value</th>
+      <th class="sh-nal-td">Beg Value</th><th class="sh-nal-td">Stock %</th><th class="sh-nal-td">Bond %</th><th class="sh-nal-td">Acct Ret</th><th class="sh-nal-td">End Value</th>
+      <th class="sh-nal-te">Beg Value</th><th class="sh-nal-te">Stock %</th><th class="sh-nal-te">Bond %</th><th class="sh-nal-te">Acct Ret</th><th class="sh-nal-te">End Value</th>
+      <th class="sh-summary">AL Total</th><th class="sh-summary">AL After-Tax</th><th class="sh-summary">NAL Total</th><th class="sh-summary">NAL After-Tax</th><th class="sh-summary">Difference</th>
+    </tr>
+  `;
+
+  const dataRows = rows.map((r, i) => {
+    const rowClass = i % 2 === 0 ? 'even' : 'odd';
+    const diffClass = r.diff > 0 ? 'pos' : r.diff < 0 ? 'neg' : 'zero';
+    return `
+      <tr class="${rowClass}">
+        <td class="td-year">${r.year}</td>
+        <td>${fmtPct(r.sr, true)}</td>
+        <td>${fmtPct(r.br, true)}</td>
+        <td>${fmt$(r.al_td_beg)}</td><td>${fmtAlloc(r.al_td_sp)}</td><td>${fmtAlloc(r.al_td_bp)}</td><td>${fmtPct(r.al_td_ret, true)}</td><td>${fmt$(r.al_td_end)}</td>
+        <td>${fmt$(r.al_te_beg)}</td><td>${fmtAlloc(r.al_te_sp)}</td><td>${fmtAlloc(r.al_te_bp)}</td><td>${fmtPct(r.al_te_ret, true)}</td><td>${fmt$(r.al_te_end)}</td>
+        <td>${fmt$(r.nal_td_beg)}</td><td>${fmtAlloc(r.nal_td_sp)}</td><td>${fmtAlloc(r.nal_td_bp)}</td><td>${fmtPct(r.nal_td_ret, true)}</td><td>${fmt$(r.nal_td_end)}</td>
+        <td>${fmt$(r.nal_te_beg)}</td><td>${fmtAlloc(r.nal_te_sp)}</td><td>${fmtAlloc(r.nal_te_bp)}</td><td>${fmtPct(r.nal_te_ret, true)}</td><td>${fmt$(r.nal_te_end)}</td>
+        <td>${fmt$(r.al_total)}</td><td>${fmt$(r.al_afterTax)}</td><td>${fmt$(r.nal_total)}</td><td>${fmt$(r.nal_afterTax)}</td>
+        <td class="${diffClass}">${fmt$(r.diff)}</td>
+      </tr>
+    `;
+  }).join('');
+
+  document.getElementById('table-container').innerHTML = `
+    <div class="table-scroll">
+      <table class="median-table">
+        <thead>${colGroupHead}${colSubHead}</thead>
+        <tbody>${dataRows}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+
+// =============================================================================
+// SECTION 10 — MAIN CONTROLLER
+// =============================================================================
+
+function runSimulation() {
+  // Read inputs
+  const inp = readInputs();
+
+  // Validate
+  const errors = validateInputs(inp);
+  const errDiv = document.getElementById('validation-errors');
+  if (errors.length > 0) {
+    errDiv.innerHTML = '<ul>' + errors.map(e => `<li>${e}</li>`).join('') + '</ul>';
+    errDiv.style.display = 'block';
+    return;
+  }
+  errDiv.style.display = 'none';
+
+  // Show running indicator, disable button
+  const btn = document.getElementById('runBtn');
+  const msg = document.getElementById('running-msg');
+  btn.disabled = true;
+  msg.style.display = 'inline';
+
+  // Defer execution so the UI can repaint before the blocking computation
+  setTimeout(() => {
+    // Run simulation
+    const sim = runMonteCarlo(inp);
+
+    // Compute statistics
+    const stats = computeStats(sim.pctDiffs, inp.numSims);
+
+    // Replay the median simulation for the table
+    const medianRows = replayMedianSim(inp, sim.stockReturns, sim.bondReturns, stats.medianSimIdx);
+
+    // Render results
+    renderStats(stats, inp.numSims);
+    renderChart(inp, sim.sumAL_TD_sp, sim.sumAL_TE_sp);
+    renderTable(medianRows, sim.pctDiffs[stats.medianSimIdx], inp);
+
+    // Show results and scroll into view
+    const resultsEl = document.getElementById('results');
+    resultsEl.classList.remove('hidden');
+    resultsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    // Reset button
+    btn.disabled = false;
+    msg.style.display = 'none';
+  }, 20);
+}
+
+
+// =============================================================================
+// INITIALIZATION
+// =============================================================================
+
+document.getElementById('runBtn').addEventListener('click', runSimulation);
+</script>
+</body>
+</html>

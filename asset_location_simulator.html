@@ -265,6 +265,24 @@
     .median-table .neg { color: #e74c3c; font-weight: 600; }
     .median-table .zero{ color: #888; }
 
+    /* ── Download button ───────────────────────────────────────────── */
+    .btn-download {
+      display: inline-block;
+      background: #1a5a3a;
+      color: #fff;
+      border: none;
+      border-radius: 5px;
+      padding: 7px 18px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      transition: background 0.2s;
+      margin-left: 16px;
+      vertical-align: middle;
+    }
+    .btn-download:hover { background: #236b47; }
+
     /* ── Utility ────────────────────────────────────────────────────── */
     .hidden { display: none; }
 
@@ -404,7 +422,10 @@
 
     <!-- Median Simulation Table -->
     <section>
-      <div class="section-title">Median Simulation — Year-by-Year Detail</div>
+      <div class="section-title">
+        Median Simulation — Year-by-Year Detail
+        <button class="btn-download" id="downloadBtn" onclick="downloadCSV()">⬇ Download CSV</button>
+      </div>
       <p class="median-note" id="median-note"></p>
       <div id="table-container"></div>
     </section>
@@ -414,6 +435,13 @@
 </main>
 
 <script>
+// =============================================================================
+// MODULE STATE
+// =============================================================================
+
+let _lastMedianRows = null;  // populated after each run; used by downloadCSV()
+
+
 // =============================================================================
 // SECTION 1 — UTILITIES
 // =============================================================================
@@ -891,6 +919,7 @@ function renderStats(stats, numSims) {
 // =============================================================================
 
 function renderTable(rows, medianPctDiff, inp) {
+  _lastMedianRows = rows;
   // Update the explanatory note
   document.getElementById('median-note').innerHTML =
     `This table traces the simulation whose final outcome was closest to the median across all simulations. ` +
@@ -951,7 +980,50 @@ function renderTable(rows, medianPctDiff, inp) {
 
 
 // =============================================================================
-// SECTION 10 — MAIN CONTROLLER
+// SECTION 10 — CSV DOWNLOAD
+// =============================================================================
+
+function downloadCSV() {
+  if (!_lastMedianRows || _lastMedianRows.length === 0) return;
+
+  const headers = [
+    'Year',
+    'Stock Return', 'Bond Return',
+    'AL TD Beg Value', 'AL TD Stock %', 'AL TD Bond %', 'AL TD Acct Return', 'AL TD End Value',
+    'AL TE Beg Value', 'AL TE Stock %', 'AL TE Bond %', 'AL TE Acct Return', 'AL TE End Value',
+    'NAL TD Beg Value', 'NAL TD Stock %', 'NAL TD Bond %', 'NAL TD Acct Return', 'NAL TD End Value',
+    'NAL TE Beg Value', 'NAL TE Stock %', 'NAL TE Bond %', 'NAL TE Acct Return', 'NAL TE End Value',
+    'AL Total', 'AL After-Tax', 'NAL Total', 'NAL After-Tax', 'Difference',
+  ];
+
+  const pct = v => (v * 100).toFixed(4);   // store as plain number e.g. 10.2345
+  const dollar = v => v.toFixed(2);
+
+  const csvRows = [headers.join(',')];
+  for (const r of _lastMedianRows) {
+    csvRows.push([
+      r.year,
+      pct(r.sr), pct(r.br),
+      dollar(r.al_td_beg), pct(r.al_td_sp), pct(r.al_td_bp), pct(r.al_td_ret), dollar(r.al_td_end),
+      dollar(r.al_te_beg), pct(r.al_te_sp), pct(r.al_te_bp), pct(r.al_te_ret), dollar(r.al_te_end),
+      dollar(r.nal_td_beg), pct(r.nal_td_sp), pct(r.nal_td_bp), pct(r.nal_td_ret), dollar(r.nal_td_end),
+      dollar(r.nal_te_beg), pct(r.nal_te_sp), pct(r.nal_te_bp), pct(r.nal_te_ret), dollar(r.nal_te_end),
+      dollar(r.al_total), dollar(r.al_afterTax), dollar(r.nal_total), dollar(r.nal_afterTax), dollar(r.diff),
+    ].join(','));
+  }
+
+  const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = 'median_simulation.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+
+// =============================================================================
+// SECTION 11 — MAIN CONTROLLER
 // =============================================================================
 
 function runSimulation() {
